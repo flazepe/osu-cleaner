@@ -6,8 +6,8 @@ use std::{
     path::PathBuf,
 };
 
-const IMAGE_EXTS: [&str; 3] = ["jpeg", "jpg", "png"];
 const VIDEO_EXTS: [&str; 5] = ["avi", "flv", "m4v", "mkv", "mp4"];
+const IMAGE_EXTS: [&str; 3] = ["jpeg", "jpg", "png"];
 const AUDIO_EXTS: [&str; 3] = ["mp3", "ogg", "wav"];
 
 #[derive(Debug)]
