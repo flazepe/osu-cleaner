@@ -1,6 +1,6 @@
 # osu-cleaner
 
-A simple CLI tool that cleans your osu! song folder to save space.
+A simple CLI tool that cleans your osu! song folder by deleting unnecessary beatmapset files to save space.
 
 ## Setup
 
