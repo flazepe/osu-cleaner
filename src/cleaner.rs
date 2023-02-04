@@ -207,7 +207,6 @@ impl Cleaner {
     fn clean(&self, beatmapset_path: &PathBuf, files: &Files) -> Result<u64> {
         let mut total_size: u64 = 0;
 
-        /*
         if self.args.debug {
             println!(
                 "\n{}\n{:#?}\n",
@@ -217,7 +216,6 @@ impl Cleaner {
                 files
             );
         }
-        */
 
         if self.args.backgrounds {
             total_size += self.bulk_remove(&beatmapset_path, &files.core_images, false)?;
