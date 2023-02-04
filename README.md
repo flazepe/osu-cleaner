@@ -1,5 +1,7 @@
 # osu-cleaner
 
+A simple CLI tool that cleans your osu! song folder to save space.
+
 ## Setup
 
 Download the latest binary and run the `osu-cleaner` command in the command line/terminal.
