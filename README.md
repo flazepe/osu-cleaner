@@ -4,7 +4,7 @@ A simple CLI tool that cleans your osu! song folder by deleting unnecessary beat
 
 ## Setup
 
-Download the latest binary and run the `osu-cleaner` command in the command line/terminal.
+Download the latest binary and run the `osu-cleaner` command in the command line/terminal. Run `osu-cleaner --help` for more information on how to use it.
 
 ### Example Usages
 
