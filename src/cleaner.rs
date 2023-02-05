@@ -174,6 +174,33 @@ impl Cleaner {
                 }
             }
 
+            // Filter out directories that contain core images from the directories component if exist
+            if !self.args.backgrounds
+                && files
+                    .core_images
+                    .files
+                    .iter()
+                    .any(|core_image| core_image.contains('/') || core_image.contains('\\'))
+            {
+                let directories = files
+                    .core_images
+                    .files
+                    .iter()
+                    .map(|core_image| {
+                        core_image
+                            .split(if core_image.contains('/') { '/' } else { '\\' })
+                            .collect::<Vec<&str>>()[0]
+                    })
+                    .collect::<Vec<&str>>();
+
+                files.directories.files = files
+                    .directories
+                    .files
+                    .into_iter()
+                    .filter(|directory| !directories.contains(&directory.as_str()))
+                    .collect();
+            }
+
             // Filter out core images from all images
             files.images.files = files
                 .images
