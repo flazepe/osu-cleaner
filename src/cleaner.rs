@@ -175,7 +175,7 @@ impl Cleaner {
             }
 
             // Filter out directories that contain core images from the directories component if exist
-            if !self.args.backgrounds
+            if (!self.args.backgrounds || self.args.all)
                 && files
                     .core_images
                     .files
