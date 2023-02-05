@@ -75,154 +75,156 @@ impl Cleaner {
 
             let beatmapset_path = dir_entry?.path();
 
-            for entry in read_dir(&beatmapset_path)? {
-                let file = entry?;
+            if let Ok(entries) = read_dir(&beatmapset_path) {
+                for entry in entries {
+                    let file = entry?;
 
-                let file_name = file
-                    .file_name()
-                    .to_str()
-                    .context("Could not convert OsString to str!")?
-                    .to_lowercase();
+                    let file_name = file
+                        .file_name()
+                        .to_str()
+                        .context("Could not convert OsString to str!")?
+                        .to_lowercase();
 
-                // Add directories to file list as part of storyboards deletion feature
-                if file.metadata()?.is_dir() {
-                    files.directories.files.push(file_name);
-                    files.directories.total_size += file.metadata()?.len();
+                    // Add directories to file list as part of storyboards deletion feature
+                    if file.metadata()?.is_dir() {
+                        files.directories.files.push(file_name);
+                        files.directories.total_size += file.metadata()?.len();
 
-                    continue;
-                }
+                        continue;
+                    }
 
-                // Parse file names from .osu files
-                if file_name.ends_with(".osu") {
-                    for mut line in read_to_string(file.path())?.split("\n") {
-                        line = line.trim();
+                    // Parse file names from .osu files
+                    if file_name.ends_with(".osu") {
+                        for mut line in read_to_string(file.path())?.split("\n") {
+                            line = line.trim();
 
-                        // Audio
-                        if line.starts_with("AudioFilename:") {
-                            let audio = line
-                                .chars()
-                                .skip(14)
-                                .collect::<String>()
-                                .trim()
-                                .to_lowercase();
+                            // Audio
+                            if line.starts_with("AudioFilename:") {
+                                let audio = line
+                                    .chars()
+                                    .skip(14)
+                                    .collect::<String>()
+                                    .trim()
+                                    .to_lowercase();
 
-                            if !files.core_sounds.files.contains(&audio) {
-                                files.core_sounds.total_size +=
-                                    match File::open(beatmapset_path.join(&audio)) {
-                                        Ok(audio_file) => audio_file.metadata()?.len(),
-                                        Err(_) => 0,
+                                if !files.core_sounds.files.contains(&audio) {
+                                    files.core_sounds.total_size +=
+                                        match File::open(beatmapset_path.join(&audio)) {
+                                            Ok(audio_file) => audio_file.metadata()?.len(),
+                                            Err(_) => 0,
+                                        };
+
+                                    files.core_sounds.files.push(audio);
+                                }
+                            }
+
+                            // Background
+                            if line.starts_with("0,0,")
+                                && IMAGE_EXTS.iter().any(|ext| line.contains(ext))
+                            {
+                                let mut background =
+                                    line.split(",").collect::<Vec<&str>>()[2].to_lowercase();
+
+                                if background.starts_with('"') {
+                                    background = background
+                                        .chars()
+                                        .skip(1)
+                                        .take(background.len() - 2)
+                                        .collect();
+                                }
+
+                                if !files.core_images.files.contains(&background) {
+                                    // We'll ignore images that are inside another directory
+                                    if !background.contains(['/', '\\']) {
+                                        files.core_images.total_size +=
+                                            match File::open(beatmapset_path.join(&background)) {
+                                                Ok(background_file) => {
+                                                    background_file.metadata()?.len()
+                                                }
+                                                Err(_) => 0,
+                                            }
                                     };
 
-                                files.core_sounds.files.push(audio);
-                            }
-                        }
-
-                        // Background
-                        if line.starts_with("0,0,")
-                            && IMAGE_EXTS.iter().any(|ext| line.contains(ext))
-                        {
-                            let mut background =
-                                line.split(",").collect::<Vec<&str>>()[2].to_lowercase();
-
-                            if background.starts_with('"') {
-                                background = background
-                                    .chars()
-                                    .skip(1)
-                                    .take(background.len() - 2)
-                                    .collect();
-                            }
-
-                            if !files.core_images.files.contains(&background) {
-                                // We'll ignore images that are inside another directory
-                                if !background.contains(['/', '\\']) {
-                                    files.core_images.total_size +=
-                                        match File::open(beatmapset_path.join(&background)) {
-                                            Ok(background_file) => {
-                                                background_file.metadata()?.len()
-                                            }
-                                            Err(_) => 0,
-                                        }
-                                };
-
-                                files.core_images.files.push(background);
+                                    files.core_images.files.push(background);
+                                }
                             }
                         }
                     }
+                    // Add other files to file list
+                    else {
+                        // Storyboards
+                        if file_name.ends_with("osb") {
+                            files.storyboards.total_size += file.metadata()?.len();
+                            files.storyboards.files.push(file_name);
+                        }
+                        // Videos
+                        else if VIDEO_EXTS.iter().any(|ext| file_name.ends_with(ext)) {
+                            files.videos.total_size += file.metadata()?.len();
+                            files.videos.files.push(file_name);
+                        }
+                        // Images
+                        else if IMAGE_EXTS.iter().any(|ext| file_name.ends_with(ext)) {
+                            files.images.total_size += file.metadata()?.len();
+                            files.images.files.push(file_name);
+                        }
+                        // Sounds
+                        else if AUDIO_EXTS.iter().any(|ext| file_name.ends_with(ext)) {
+                            files.sounds.total_size += file.metadata()?.len();
+                            files.sounds.files.push(file_name);
+                        }
+                    }
                 }
-                // Add other files to file list
-                else {
-                    // Storyboards
-                    if file_name.ends_with("osb") {
-                        files.storyboards.total_size += file.metadata()?.len();
-                        files.storyboards.files.push(file_name);
-                    }
-                    // Videos
-                    else if VIDEO_EXTS.iter().any(|ext| file_name.ends_with(ext)) {
-                        files.videos.total_size += file.metadata()?.len();
-                        files.videos.files.push(file_name);
-                    }
-                    // Images
-                    else if IMAGE_EXTS.iter().any(|ext| file_name.ends_with(ext)) {
-                        files.images.total_size += file.metadata()?.len();
-                        files.images.files.push(file_name);
-                    }
-                    // Sounds
-                    else if AUDIO_EXTS.iter().any(|ext| file_name.ends_with(ext)) {
-                        files.sounds.total_size += file.metadata()?.len();
-                        files.sounds.files.push(file_name);
-                    }
+
+                // Filter out directories that contain core images from the directories component if exist
+                if (!self.args.backgrounds || self.args.all)
+                    && files
+                        .core_images
+                        .files
+                        .iter()
+                        .any(|core_image| core_image.contains('/') || core_image.contains('\\'))
+                {
+                    let directories = files
+                        .core_images
+                        .files
+                        .iter()
+                        .map(|core_image| {
+                            core_image
+                                .split(if core_image.contains('/') { '/' } else { '\\' })
+                                .collect::<Vec<&str>>()[0]
+                        })
+                        .collect::<Vec<&str>>();
+
+                    files.directories.files = files
+                        .directories
+                        .files
+                        .into_iter()
+                        .filter(|directory| !directories.contains(&directory.as_str()))
+                        .collect();
                 }
-            }
 
-            // Filter out directories that contain core images from the directories component if exist
-            if (!self.args.backgrounds || self.args.all)
-                && files
-                    .core_images
-                    .files
-                    .iter()
-                    .any(|core_image| core_image.contains('/') || core_image.contains('\\'))
-            {
-                let directories = files
-                    .core_images
-                    .files
-                    .iter()
-                    .map(|core_image| {
-                        core_image
-                            .split(if core_image.contains('/') { '/' } else { '\\' })
-                            .collect::<Vec<&str>>()[0]
-                    })
-                    .collect::<Vec<&str>>();
-
-                files.directories.files = files
-                    .directories
+                // Filter out core images from all images
+                files.images.files = files
+                    .images
                     .files
                     .into_iter()
-                    .filter(|directory| !directories.contains(&directory.as_str()))
+                    .filter(|image| !files.core_images.files.contains(image))
                     .collect();
+
+                files.images.total_size -= files.core_images.total_size;
+
+                // Filter out core sounds from all sounds
+                files.sounds.files = files
+                    .sounds
+                    .files
+                    .into_iter()
+                    .filter(|sound| !files.core_sounds.files.contains(sound))
+                    .collect();
+
+                files.sounds.total_size -= files.core_sounds.total_size;
+
+                // Clean beatmapset
+                total_size += self.clean(&beatmapset_path, &files)?;
             }
-
-            // Filter out core images from all images
-            files.images.files = files
-                .images
-                .files
-                .into_iter()
-                .filter(|image| !files.core_images.files.contains(image))
-                .collect();
-
-            files.images.total_size -= files.core_images.total_size;
-
-            // Filter out core sounds from all sounds
-            files.sounds.files = files
-                .sounds
-                .files
-                .into_iter()
-                .filter(|sound| !files.core_sounds.files.contains(sound))
-                .collect();
-
-            files.sounds.total_size -= files.core_sounds.total_size;
-
-            // Clean beatmapset
-            total_size += self.clean(&beatmapset_path, &files)?;
         }
 
         Ok(format!(
