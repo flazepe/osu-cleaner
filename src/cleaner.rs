@@ -301,13 +301,12 @@ impl Cleaner {
 
             if !self.args.quiet {
                 println!(
-                    "[{:0width1$}/{}] [{:0width2$}/{}] [{} MB] {}",
+                    "[{:0width1$}/{}] [{:0width2$}/{}] [{} MB] {prettified_path}",
                     self.progress,
                     self.beatmapsets,
                     index + 1,
                     component.files.len(),
                     self.saved_size / 1024 / 1024,
-                    prettified_path,
                     width1 = self.beatmapsets.to_string().len(),
                     width2 = component.files.len().to_string().len()
                 );
