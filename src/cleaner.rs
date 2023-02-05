@@ -2,8 +2,8 @@ use crate::args::Args;
 use anyhow::{Context, Result};
 use clap::Parser;
 use std::{
-    fs::{read_dir, read_to_string, remove_dir_all, remove_file, File},
-    path::PathBuf,
+    fs::{read_dir, read_to_string, remove_dir_all, remove_file, File, ReadDir},
+    path::{Path, PathBuf},
 };
 
 const VIDEO_EXTS: [&str; 5] = ["avi", "flv", "m4v", "mkv", "mp4"];
@@ -29,19 +29,28 @@ struct Files {
 
 pub struct Cleaner {
     args: Args,
+    beatmapsets: usize,
+    progress: usize,
+    saved_size: u64,
 }
 
 impl Cleaner {
     pub fn init() -> Self {
         Self {
             args: Args::parse(),
+            beatmapsets: 0,
+            progress: 0,
+            saved_size: 0,
         }
     }
 
-    pub fn start(&self) -> Result<String> {
-        let mut total_size: u64 = 0;
+    pub fn start(&mut self) -> Result<String> {
+        let directories =
+            read_dir(&self.args.song_directory_path)?.collect::<Vec<<ReadDir as Iterator>::Item>>();
 
-        for dir_entry in read_dir(&self.args.song_directory_path)? {
+        self.beatmapsets = directories.len();
+
+        for dir_entry in directories {
             let mut files = Files {
                 directories: Component {
                     total_size: 0,
@@ -223,51 +232,50 @@ impl Cleaner {
                 files.sounds.total_size -= files.core_sounds.total_size;
 
                 // Clean beatmapset
-                total_size += self.clean(&beatmapset_path, &files)?;
+                self.clean(&beatmapset_path, &files)?;
+                self.progress += 1;
             }
         }
 
         Ok(format!(
             "Successfully saved ~{} MB!",
-            total_size / 1024 / 1024
+            self.saved_size / 1024 / 1024
         ))
     }
 
-    fn clean(&self, beatmapset_path: &PathBuf, files: &Files) -> Result<u64> {
-        let mut total_size: u64 = 0;
-
-        if self.args.debug {
-            println!(
-                "\n{}\n{:#?}\n",
-                beatmapset_path
-                    .to_str()
-                    .context("Could not convert PathBuf to str!")?,
-                files
-            );
-        }
+    fn clean(&mut self, beatmapset_path: &PathBuf, files: &Files) -> Result<()> {
+        /*
+        println!(
+            "\n{}\n{:#?}\n",
+            beatmapset_path
+                .to_str()
+                .context("Could not convert PathBuf to str!")?,
+            files
+        );
+        */
 
         if self.args.backgrounds {
-            total_size += self.bulk_remove(&beatmapset_path, &files.core_images, false)?;
+            self.saved_size += self.bulk_remove(&beatmapset_path, &files.core_images, false)?;
         }
 
         if self.args.all || self.args.storyboards {
-            total_size += self.bulk_remove(&beatmapset_path, &files.directories, true)?;
-            total_size += self.bulk_remove(&beatmapset_path, &files.storyboards, false)?;
+            self.saved_size += self.bulk_remove(&beatmapset_path, &files.directories, true)?;
+            self.saved_size += self.bulk_remove(&beatmapset_path, &files.storyboards, false)?;
         }
 
         if self.args.all || self.args.videos {
-            total_size += self.bulk_remove(&beatmapset_path, &files.videos, false)?;
+            self.saved_size += self.bulk_remove(&beatmapset_path, &files.videos, false)?;
         }
 
         if self.args.all || self.args.images {
-            total_size += self.bulk_remove(&beatmapset_path, &files.images, false)?;
+            self.saved_size += self.bulk_remove(&beatmapset_path, &files.images, false)?;
         }
 
         if self.args.all || self.args.sounds {
-            total_size += self.bulk_remove(&beatmapset_path, &files.sounds, false)?;
+            self.saved_size += self.bulk_remove(&beatmapset_path, &files.sounds, false)?;
         }
 
-        Ok(total_size)
+        Ok(())
     }
 
     fn bulk_remove(
@@ -276,25 +284,45 @@ impl Cleaner {
         component: &Component,
         is_dir: bool,
     ) -> Result<u64> {
-        for file in &component.files {
+        for (index, file) in component.files.iter().enumerate() {
             let path = beatmapset_path.join(file);
-            let prettified_path = path.to_str().context("Could not convert PathBuf to str!")?;
+
+            let prettified_path = Path::new(
+                beatmapset_path
+                    .iter()
+                    .last()
+                    .context("Could not get last path!")?,
+            )
+            .join(file);
+
+            let prettified_path = prettified_path
+                .to_str()
+                .context("Could not convert PathBuf to str!")?;
+
+            if !self.args.quiet {
+                println!(
+                    "[{:0width1$}/{}] [{:0width2$}/{}] [{} MB] {}",
+                    self.progress,
+                    self.beatmapsets,
+                    index + 1,
+                    component.files.len(),
+                    self.saved_size / 1024 / 1024,
+                    prettified_path,
+                    width1 = self.beatmapsets.to_string().len(),
+                    width2 = component.files.len().to_string().len()
+                );
+            }
 
             if !self.args.debug {
-                match if is_dir {
+                if let Err(err) = if is_dir {
                     remove_dir_all(&path)
                 } else {
                     remove_file(&path)
                 } {
-                    Ok(_) => {
-                        if !self.args.quiet {
-                            println!("{}", prettified_path);
-                        }
-                    }
-                    Err(err) => println!(
+                    println!(
                         "An error occurred while trying to remove {}: {}",
                         prettified_path, err
-                    ),
+                    );
                 }
             }
         }
