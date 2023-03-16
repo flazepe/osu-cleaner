@@ -1,5 +1,5 @@
-pub mod args;
-pub mod cleaner;
+mod args;
+mod cleaner;
 
 use cleaner::Cleaner;
 
